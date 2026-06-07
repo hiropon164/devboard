@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>devboard — project console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0e12; --bg2:#121419; --panel:#16181f; --panel2:#1b1e27;
+    --line:#262a35; --line2:#323744;
+    --txt:#e7e9ee; --muted:#888fa0; --faint:#5b6070;
+    --accent:#f2a93b; --accent-dim:#7a5a20;
+    --green:#56d364; --orange:#e3953b; --blue:#6cb6ff; --violet:#d2a8ff;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:var(--sans); color:var(--txt);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #1a1d27 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.012) 39px 40px),
+      var(--bg);
+    font-size:14px; -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--blue); text-decoration:none} a:hover{text-decoration:underline}
+  .app{display:grid; grid-template-rows:auto 1fr; height:100vh}
+
+  /* top bar */
+  header{
+    display:flex; align-items:center; gap:18px; padding:14px 20px;
+    border-bottom:1px solid var(--line); background:rgba(13,14,18,.7);
+    backdrop-filter:blur(8px);
+  }
+  .brand{font-family:var(--mono); font-weight:600; letter-spacing:.18em;
+    font-size:15px; color:var(--accent)}
+  .brand b{color:var(--txt)}
+  .root{font-family:var(--mono); font-size:12px; color:var(--faint);
+    border-left:1px solid var(--line); padding-left:16px}
+  .root b{color:var(--muted)}
+  .spacer{flex:1}
+  .count{font-family:var(--mono); font-size:12px; color:var(--muted)}
+  button.btn{
+    font-family:var(--mono); font-size:12px; letter-spacing:.04em;
+    background:var(--panel2); color:var(--txt); border:1px solid var(--line2);
+    padding:8px 14px; border-radius:7px; cursor:pointer; transition:.15s;
+  }
+  button.btn:hover{border-color:var(--accent); color:var(--accent)}
+  button.btn:active{transform:translateY(1px)}
+
+  /* main split */
+  .main{display:grid; grid-template-columns:380px 1fr; min-height:0}
+  .list{border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0}
+  .filters{padding:12px; display:flex; flex-direction:column; gap:8px; border-bottom:1px solid var(--line)}
+  .filters input, .filters select{
+    font-family:var(--sans); font-size:13px; color:var(--txt);
+    background:var(--bg2); border:1px solid var(--line); border-radius:7px; padding:9px 11px;
+  }
+  .filters input:focus, .filters select:focus{outline:none; border-color:var(--accent-dim)}
+  .filter-row{display:flex; gap:8px}
+  .filter-row select{flex:1}
+  .filter-extra{display:flex; gap:14px; align-items:center; font-family:var(--mono); font-size:11px; color:var(--muted)}
+  .filter-extra label{display:flex; gap:6px; align-items:center; cursor:pointer}
+  .filter-extra input[type=checkbox]{accent-color:var(--accent)}
+
+  .items{overflow:auto; flex:1; min-height:0}
+  .item{
+    padding:13px 16px; border-bottom:1px solid var(--line); cursor:pointer;
+    border-left:3px solid transparent; transition:background .12s;
+  }
+  .item:hover{background:var(--panel)}
+  .item.sel{background:var(--panel2); border-left-color:var(--accent)}
+  .item.archived{opacity:.55}
+  .item .top{display:flex; align-items:center; gap:8px}
+  .dot{width:8px; height:8px; border-radius:50%; flex:none}
+  .dot.clean{background:var(--green)} .dot.dirty{background:var(--orange)}
+  .dot.nogit{background:var(--faint)}
+  .item .name{font-weight:600; font-size:14px}
+  .item .star{color:var(--accent); font-size:13px}
+  .item .archlabel{font-family:var(--mono); font-size:10px; letter-spacing:.05em;
+    color:var(--faint); border:1px solid var(--line2); padding:1px 5px; border-radius:4px}
+  .item .when{margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--faint)}
+  .item .meta{margin-top:5px; font-size:12px; color:var(--muted);
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+  .lang{color:var(--violet); font-family:var(--mono); font-size:11px}
+  .tag{font-family:var(--mono); font-size:10px; letter-spacing:.03em;
+    padding:1px 7px; border-radius:999px; border:1px solid var(--accent-dim);
+    color:var(--accent); background:rgba(242,169,59,.07)}
+  .tag.user{border-color:var(--line2); color:var(--blue);
+    background:rgba(108,182,255,.07)}
+  .item .desc{margin-top:6px; font-size:12px; color:var(--faint);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+  /* detail */
+  .detail{overflow:auto; padding:0; min-height:0}
+  .empty{height:100%; display:flex; align-items:center; justify-content:center;
+    color:var(--faint); font-family:var(--mono); font-size:13px; letter-spacing:.05em}
+  .dhead{padding:24px 32px 18px; border-bottom:1px solid var(--line)}
+  .dtop{display:flex; align-items:flex-start; gap:16px}
+  .dtop .grow{flex:1; min-width:0}
+  .dl-wrap{display:flex; align-items:center; gap:8px; flex:none; flex-wrap:wrap; justify-content:flex-end}
+  a.dl, button.dl{font-family:var(--mono); font-size:12px; letter-spacing:.04em;
+    background:var(--panel2); color:var(--accent); border:1px solid var(--accent-dim);
+    padding:9px 14px; border-radius:7px; white-space:nowrap; transition:.15s; cursor:pointer}
+  a.dl:hover, button.dl:hover{background:rgba(242,169,59,.12); text-decoration:none}
+  a.dl.full{color:var(--muted); border-color:var(--line2); font-size:11px; padding:9px 10px}
+  a.dl.full:hover{color:var(--txt)}
+  a.ide{color:var(--blue); border-color:#2b4762; background:rgba(108,182,255,.07)}
+  a.ide:hover{background:rgba(108,182,255,.14)}
+  button.fav{font-family:var(--mono); font-size:16px; cursor:pointer;
+    background:var(--panel2); border:1px solid var(--line2); padding:6px 10px;
+    border-radius:7px; transition:.15s; color:var(--faint)}
+  button.fav.on{color:var(--accent); border-color:var(--accent-dim)}
+  button.fav:hover{border-color:var(--accent)}
+  button.del{font-family:var(--mono); font-size:12px; letter-spacing:.04em; cursor:pointer;
+    background:var(--panel2); color:#f0857a; border:1px solid #5c2f2c; padding:9px 13px;
+    border-radius:7px; white-space:nowrap; transition:.15s}
+  button.del:hover{background:rgba(240,133,122,.12); border-color:#f0857a}
+  button.arch{font-family:var(--mono); font-size:12px; letter-spacing:.04em; cursor:pointer;
+    background:var(--panel2); color:var(--muted); border:1px solid var(--line2);
+    padding:9px 13px; border-radius:7px; white-space:nowrap; transition:.15s}
+  button.arch:hover{background:rgba(255,255,255,.04); color:var(--txt); border-color:var(--accent-dim)}
+
+  /* drop zone */
+  .dropzone{flex:none; margin:10px 12px 12px; padding:18px 14px; border-radius:10px;
+    border:1.5px dashed var(--line2); text-align:center; color:var(--muted);
+    font-family:var(--mono); font-size:12px; line-height:1.7; cursor:default;
+    transition:.15s; background:var(--bg2)}
+  .dropzone b{color:var(--accent)}
+  .dropzone small{color:var(--faint); font-size:11px}
+  .dropzone.over{border-color:var(--accent); color:var(--accent);
+    background:rgba(242,169,59,.07); border-style:solid}
+
+  /* toast */
+  #toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:var(--panel2); border:1px solid var(--line2); color:var(--txt);
+    font-family:var(--mono); font-size:13px; padding:11px 18px; border-radius:9px;
+    box-shadow:0 8px 30px rgba(0,0,0,.5); opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; max-width:80vw}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(-4px)}
+  #toast.err{border-color:#5c2f2c; color:#f0857a}
+  .dhead h1{margin:0; font-size:24px; font-weight:600; display:flex; align-items:center; gap:10px}
+  .dhead h1 .archpill{font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+    color:var(--muted); background:var(--panel2); border:1px solid var(--line2);
+    padding:3px 8px; border-radius:4px; font-weight:400}
+  .dpath{font-family:var(--mono); font-size:12px; color:var(--faint); margin-top:4px}
+  .stats{display:flex; gap:24px; flex-wrap:wrap; margin-top:16px}
+  .stat .k{font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--faint)}
+  .stat .v{font-size:14px; margin-top:3px}
+  .v.clean{color:var(--green)} .v.dirty{color:var(--orange)} .v.nogit{color:var(--faint)}
+
+  /* user tags editor */
+  .tagrow{margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+  .tagrow .k{font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--faint); margin-right:6px}
+  .utag{font-family:var(--mono); font-size:11px; padding:2px 6px 2px 9px;
+    border:1px solid var(--line2); color:var(--blue);
+    background:rgba(108,182,255,.07); border-radius:999px;
+    display:inline-flex; align-items:center; gap:5px}
+  .utag .x{cursor:pointer; opacity:.6; font-size:13px; line-height:1; padding:0 2px}
+  .utag .x:hover{opacity:1; color:#f0857a}
+  .tagrow input{font-family:var(--mono); font-size:11px; color:var(--txt);
+    background:var(--bg2); border:1px dashed var(--line2); padding:3px 8px;
+    border-radius:999px; width:140px}
+  .tagrow input:focus{outline:none; border-style:solid; border-color:var(--accent-dim)}
+
+  .tabs{display:flex; gap:4px; padding:0 32px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .tab{font-family:var(--mono); font-size:12px; letter-spacing:.05em; padding:13px 14px;
+    color:var(--muted); cursor:pointer; border-bottom:2px solid transparent}
+  .tab:hover{color:var(--txt)}
+  .tab.on{color:var(--accent); border-bottom-color:var(--accent)}
+  .tab .badge{font-size:10px; color:var(--faint); margin-left:6px}
+  .pane{padding:24px 32px 56px}
+
+  /* rendered readme */
+  .md{max-width:760px; line-height:1.65}
+  .md h1,.md h2,.md h3{font-weight:600; line-height:1.3; margin:1.4em 0 .5em}
+  .md h1{font-size:22px; border-bottom:1px solid var(--line); padding-bottom:.3em}
+  .md h2{font-size:18px} .md h3{font-size:15px}
+  .md p{margin:.7em 0; color:#cfd3dd}
+  .md ul,.md ol{margin:.6em 0; padding-left:1.5em; color:#cfd3dd}
+  .md li{margin:.25em 0}
+  .md code{font-family:var(--mono); font-size:12.5px; background:var(--bg2);
+    border:1px solid var(--line); border-radius:4px; padding:1px 5px}
+  .md pre{background:var(--bg2); border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; overflow:auto; margin:1em 0}
+  .md pre code{border:0; background:none; padding:0; font-size:12.5px; color:#d6dae4}
+  .md blockquote{border-left:3px solid var(--accent-dim); margin:1em 0;
+    padding:.2em 1em; color:var(--muted)}
+  .md hr{border:0; border-top:1px solid var(--line); margin:1.5em 0}
+  .md a{color:var(--blue)}
+  .noreadme{color:var(--faint); font-family:var(--mono); font-size:13px}
+
+  /* file list */
+  .files{font-family:var(--mono); font-size:13px; max-width:620px}
+  .frow{display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:6px}
+  .frow:hover{background:var(--panel)}
+  .frow .ic{width:16px; color:var(--faint)}
+  .frow.dir .nm{color:var(--blue)} .frow.skip .nm{color:var(--faint)}
+  .frow .sz{margin-left:auto; color:var(--faint); font-size:11px}
+
+  /* AI rules */
+  .ruleblock{margin-bottom:28px; max-width:760px}
+  .ruleblock h3{font-family:var(--mono); font-size:12px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 6px}
+  .ruleblock .rf{font-family:var(--mono); font-size:11px; color:var(--faint); margin-bottom:10px}
+  .noai{color:var(--faint); font-family:var(--mono); font-size:13px}
+
+  /* note editor */
+  .noteedit{max-width:760px}
+  .noteedit textarea{width:100%; min-height:300px; resize:vertical;
+    font-family:var(--mono); font-size:13px; color:var(--txt); line-height:1.55;
+    background:var(--bg2); border:1px solid var(--line); border-radius:8px; padding:14px;
+    outline:none}
+  .noteedit textarea:focus{border-color:var(--accent-dim)}
+  .noteedit .actions{margin-top:10px; display:flex; gap:10px; align-items:center}
+  .savedstate{font-family:var(--mono); font-size:11px; color:var(--faint)}
+
+  .info dt{font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--faint); margin-top:14px}
+  .info dd{margin:4px 0 0; font-family:var(--mono); font-size:13px; word-break:break-all}
+  .loading{color:var(--faint); font-family:var(--mono); padding:24px 32px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="brand">DEV<b>BOARD</b></span>
+    <span class="root">root <b id="root">…</b></span>
+    <span class="spacer"></span>
+    <span class="count" id="count"></span>
+    <button class="btn" id="rescan">↻ Rescan</button>
+  </header>
+
+  <div class="main">
+    <aside class="list">
+      <div class="filters">
+        <input id="q" placeholder="Search name, language, description, tag…" autocomplete="off">
+        <div class="filter-row">
+          <select id="ftool"><option value="">All AI tools</option></select>
+          <select id="fstatus">
+            <option value="">All statuses</option>
+            <option value="dirty">Uncommitted</option>
+            <option value="clean">Clean</option>
+            <option value="nogit">No git</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <select id="ftag"><option value="">All tags</option></select>
+          <select id="fsort">
+            <option value="last_activity">Sort: last activity</option>
+            <option value="name">Sort: name (A-Z)</option>
+            <option value="status">Sort: dirty first</option>
+            <option value="favorite">Sort: favorites first</option>
+          </select>
+        </div>
+        <div class="filter-extra">
+          <label><input type="checkbox" id="fav"> Favorites only</label>
+          <label><input type="checkbox" id="archived"> Show archived</label>
+        </div>
+      </div>
+      <div class="items" id="items"></div>
+      <div class="dropzone" id="drop">
+        <div>＋ <b>Drop a project here</b></div>
+        <small>folder or .zip — uploaded to the projects directory</small>
+      </div>
+    </aside>
+
+    <section class="detail" id="detail">
+      <div class="empty">select a project ◂</div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let PROJECTS = [], SELECTED = null, TAB = "readme", CONFIG = {};
+
+function status(p){ return !p.git.is_repo ? "nogit" : (p.git.dirty ? "dirty" : "clean"); }
+function esc(s){ return (s||"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtSize(n){ if(!n) return ""; const u=["B","K","M","G"]; let i=0; while(n>=1024&&i<3){n/=1024;i++;} return n.toFixed(n<10&&i?1:0)+u[i]; }
+function fmtActivity(iso){
+  if(!iso) return "";
+  try{
+    const d = new Date(iso); if(isNaN(d)) return iso;
+    const days = Math.floor((Date.now() - d.getTime())/86400000);
+    if(days < 1) return "today";
+    if(days < 2) return "yesterday";
+    if(days < 30) return days + "d ago";
+    if(days < 365) return Math.floor(days/30) + "mo ago";
+    return Math.floor(days/365) + "y ago";
+  }catch(e){ return iso; }
+}
+
+/* ---- minimal, safe markdown renderer ---- */
+function md(src){
+  if(!src) return '<p class="noreadme">No README in this project.</p>';
+  const blocks=[];
+  src = src.replace(/```([\s\S]*?)```/g, (m,c)=>{ blocks.push(c.replace(/^\n/,'')); return "\u0000"+(blocks.length-1)+"\u0000"; });
+  const lines = esc(src).split("\n");
+  let html="", list=null;
+  const inline = t => t
+    .replace(/\u0000(\d+)\u0000/g, (m,i)=>"<pre><code>"+esc(blocks[+i])+"</code></pre>")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '<em>[$1]</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
+  const closeList = ()=>{ if(list){ html+="</"+list+">"; list=null; } };
+  for(let raw of lines){
+    if(/^\u0000\d+\u0000$/.test(raw.trim())){ closeList(); html+=inline(raw.trim()); continue; }
+    const h = raw.match(/^(#{1,3})\s+(.*)/);
+    if(h){ closeList(); html+="<h"+h[1].length+">"+inline(h[2])+"</h"+h[1].length+">"; continue; }
+    if(/^\s*(-{3,}|\*{3,})\s*$/.test(raw)){ closeList(); html+="<hr>"; continue; }
+    if(/^\s*>\s?/.test(raw)){ closeList(); html+="<blockquote>"+inline(raw.replace(/^\s*>\s?/,''))+"</blockquote>"; continue; }
+    const ul = raw.match(/^\s*[-*]\s+(.*)/);
+    if(ul){ if(list!=="ul"){ closeList(); html+="<ul>"; list="ul"; } html+="<li>"+inline(ul[1])+"</li>"; continue; }
+    const ol = raw.match(/^\s*\d+\.\s+(.*)/);
+    if(ol){ if(list!=="ol"){ closeList(); html+="<ol>"; list="ol"; } html+="<li>"+inline(ol[1])+"</li>"; continue; }
+    if(raw.trim()===""){ closeList(); continue; }
+    closeList(); html+="<p>"+inline(raw)+"</p>";
+  }
+  closeList();
+  return html;
+}
+
+/* ---- list ---- */
+function sortProjects(rows, by){
+  const a = rows.slice();
+  if(by==="name") a.sort((x,y)=>x.name.localeCompare(y.name));
+  else if(by==="status") a.sort((x,y)=>(status(y)==="dirty") - (status(x)==="dirty"));
+  else if(by==="favorite") a.sort((x,y)=>(y.favorite?1:0) - (x.favorite?1:0)
+                                       || (y.last_activity||"").localeCompare(x.last_activity||""));
+  else a.sort((x,y)=>(y.last_activity||y.mtime||"").localeCompare(x.last_activity||x.mtime||""));
+  return a;
+}
+
+function renderList(){
+  const q = $("#q").value.toLowerCase();
+  const tf = $("#ftool").value, sf = $("#fstatus").value, tagf = $("#ftag").value;
+  const sortBy = $("#fsort").value;
+  const favOnly = $("#fav").checked;
+  let rows = PROJECTS.filter(p =>
+    (!q || (p.name+p.languages.join()+(p.summary||"")+p.ai_tools.join()+(p.tags||[]).join()).toLowerCase().includes(q)) &&
+    (!tf || p.ai_tools.includes(tf)) &&
+    (!sf || status(p)===sf) &&
+    (!tagf || (p.tags||[]).includes(tagf)) &&
+    (!favOnly || p.favorite));
+  rows = sortProjects(rows, sortBy);
+  $("#count").textContent = rows.length+" / "+PROJECTS.length+" projects";
+  $("#items").innerHTML = rows.map(p => {
+    const st = status(p);
+    const aiTags = p.ai_tools.map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+    const userTags = (p.tags||[]).map(t=>`<span class="tag user">${esc(t)}</span>`).join("");
+    const star = p.favorite ? '<span class="star">★</span>' : '';
+    const arch = p.archived ? '<span class="archlabel">archived</span>' : '';
+    return `<div class="item ${SELECTED===p.path?'sel':''} ${p.archived?'archived':''}" data-path="${esc(p.path)}">
+      <div class="top">
+        <span class="dot ${st}"></span>
+        <span class="name">${esc(p.name)}</span>
+        ${star} ${arch}
+        <span class="when">${esc(fmtActivity(p.last_activity||p.git.last_commit_iso||p.mtime))}</span>
+      </div>
+      <div class="meta"><span class="lang">${esc(p.languages.join(" · "))}</span>${aiTags}${userTags}</div>
+      ${p.summary?`<div class="desc">${esc(p.summary)}</div>`:""}
+    </div>`;
+  }).join("") || `<div class="loading">No matches.</div>`;
+  document.querySelectorAll(".item").forEach(el =>
+    el.onclick = () => select(el.dataset.path));
+}
+
+/* ---- detail ---- */
+async function select(path){
+  SELECTED = path; renderList();
+  $("#detail").innerHTML = `<div class="loading">loading…</div>`;
+  let d;
+  try { d = await (await fetch("/api/project?path="+encodeURIComponent(path))).json(); }
+  catch(e){ $("#detail").innerHTML = `<div class="loading">failed to load</div>`; return; }
+  const st = status(d), g = d.git;
+  const statusText = !g.is_repo ? "no git" : (g.dirty ? `${g.changes} uncommitted` : "clean");
+  const ahead = g.is_repo && (g.ahead||g.behind) ? `↑${g.ahead} ↓${g.behind}` : "";
+
+  // IDE open buttons (only if configured)
+  let ideButtons = "";
+  if(CONFIG.ide_enabled && d.ide_host_path){
+    const ssh = encodeURIComponent("ssh-remote+"+CONFIG.ide_remote_host);
+    const p = d.ide_host_path;
+    ideButtons = `
+      <a class="dl ide" href="vscode://vscode-remote/${ssh}${esc(p)}" title="VS Code Remote-SSH で開く">VS Code</a>
+      <a class="dl ide" href="cursor://vscode-remote/${ssh}${esc(p)}" title="Cursor Remote-SSH で開く">Cursor</a>`;
+  }
+
+  const archBtn = d.archived
+    ? `<button class="arch" onclick="unarchive('${esc(d.path).replace(/'/g,"\\'")}','${esc(d.name).replace(/'/g,"\\'")}')">↩ Unarchive</button>`
+    : `<button class="arch" onclick="archive('${esc(d.path).replace(/'/g,"\\'")}','${esc(d.name).replace(/'/g,"\\'")}')" title=".archive に退避（後で復元可能）">📦 Archive</button>`;
+
+  const favOn = d.favorite ? "on" : "";
+  const archPill = d.archived ? '<span class="archpill">ARCHIVED</span>' : '';
+
+  $("#detail").innerHTML = `
+    <div class="dhead">
+      <div class="dtop">
+        <div class="grow">
+          <h1>${esc(d.name)} ${archPill}</h1>
+          <div class="dpath">${esc(d.path)}</div>
+        </div>
+        <div class="dl-wrap">
+          <button class="fav ${favOn}" id="fav-toggle" title="お気に入りに登録">${d.favorite?'★':'☆'}</button>
+          ${ideButtons}
+          <a class="dl" href="/api/download?path=${encodeURIComponent(d.path)}"
+             title="Zip the project (node_modules・dist 等は除外、.git は保持)">⤓ .zip</a>
+          <a class="dl full" href="/api/download?path=${encodeURIComponent(d.path)}&full=1"
+             title="すべてのファイルを含めて圧縮">full</a>
+          ${archBtn}
+          <button class="del" onclick="del('${esc(d.path).replace(/'/g,"\\'")}','${esc(d.name).replace(/'/g,"\\'")}')"
+             title=".trash に退避（あとで復元可能）">🗑 Delete</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Language</div><div class="v">${esc(d.languages.join(", "))}</div></div>
+        <div class="stat"><div class="k">AI tool</div><div class="v">${d.ai_tools.map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")||"—"}</div></div>
+        <div class="stat"><div class="k">Branch</div><div class="v">${g.is_repo?esc(g.branch):"—"} ${esc(ahead)}</div></div>
+        <div class="stat"><div class="k">Status</div><div class="v ${st}">${esc(statusText)}</div></div>
+        <div class="stat"><div class="k">Last activity</div><div class="v">${esc(fmtActivity(d.last_activity)||"—")}</div></div>
+      </div>
+      <div class="tagrow" id="tagrow"></div>
+    </div>
+    <div class="tabs">
+      <div class="tab" data-t="readme">README</div>
+      <div class="tab" data-t="files">Files <span class="badge">${d.files.length}</span></div>
+      <div class="tab" data-t="airules">AI Rules <span class="badge">${(d.ai_rules||[]).length}</span></div>
+      <div class="tab" data-t="note">Note${d.note?'<span class="badge">●</span>':''}</div>
+      <div class="tab" data-t="info">Info</div>
+    </div>
+    <div class="pane" id="pane"></div>`;
+  document.querySelectorAll(".tab").forEach(t => t.onclick = ()=>{ TAB=t.dataset.t; paint(d); });
+  $("#fav-toggle").onclick = ()=>toggleFav(d);
+  renderTagEditor(d);
+  paint(d);
+}
+
+function renderTagEditor(d){
+  const tr = $("#tagrow");
+  const chips = (d.tags||[]).map((t,i)=>`<span class="utag">${esc(t)}<span class="x" data-i="${i}">×</span></span>`).join("");
+  tr.innerHTML = `<span class="k">Tags</span>${chips}<input id="newtag" placeholder="+ add tag…">`;
+  tr.querySelectorAll(".utag .x").forEach(x => x.onclick = ()=>{
+    const tags = (d.tags||[]).slice(); tags.splice(+x.dataset.i, 1);
+    saveTags(d, tags, d.favorite);
+  });
+  const inp = $("#newtag");
+  inp.onkeydown = e => {
+    if(e.key === "Enter" && inp.value.trim()){
+      const tags = [...new Set([...(d.tags||[]), inp.value.trim()])];
+      saveTags(d, tags, d.favorite);
+      inp.value = "";
+    }
+  };
+}
+
+async function saveTags(d, tags, favorite){
+  try{
+    const r = await (await fetch("/api/tags?path="+encodeURIComponent(d.path),
+      {method:"POST", body:JSON.stringify({tags, favorite})})).json();
+    if(r.error) return toast("タグ保存失敗: "+r.error, true);
+    d.tags = r.tags; d.favorite = r.favorite;
+    // update cached list entry too
+    const li = PROJECTS.find(p => p.path === d.path);
+    if(li){ li.tags = r.tags; li.favorite = r.favorite; }
+    renderTagEditor(d);
+    const fav = $("#fav-toggle"); if(fav){ fav.textContent = d.favorite?'★':'☆'; fav.classList.toggle("on", !!d.favorite); }
+    renderList();
+    refreshTagFilter();
+  }catch(e){ toast("タグ保存失敗: "+e, true); }
+}
+
+function toggleFav(d){ saveTags(d, d.tags||[], !d.favorite); }
+
+function paint(d){
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.t===TAB));
+  const pane = $("#pane"); const g=d.git;
+  if(TAB==="readme"){
+    pane.innerHTML = `<div class="md">${md(d.readme)}</div>`;
+  } else if(TAB==="files"){
+    pane.innerHTML = `<div class="files">${d.files.map(f=>{
+      const cls = f.kind==="dir"?"dir":(f.kind==="skipped"?"skip":"");
+      const ic = f.kind==="file"?"·":(f.kind==="skipped"?"⊘":"▸");
+      return `<div class="frow ${cls}"><span class="ic">${ic}</span><span class="nm">${esc(f.name)}</span><span class="sz">${fmtSize(f.size)}</span></div>`;
+    }).join("")}</div>`;
+  } else if(TAB==="airules"){
+    const rules = d.ai_rules || [];
+    if(!rules.length){ pane.innerHTML = `<div class="noai">No AI rule files detected (CLAUDE.md, .cursorrules, AGENTS.md, GEMINI.md, .github/copilot-instructions.md, .aider.conf.yml).</div>`; }
+    else pane.innerHTML = rules.map(r =>
+      `<div class="ruleblock">
+        <h3>${esc(r.tool)}</h3>
+        <div class="rf">${esc(r.file)}</div>
+        <div class="md">${md(r.content)}</div>
+      </div>`).join("");
+  } else if(TAB==="note"){
+    pane.innerHTML = `
+      <div class="noteedit">
+        <textarea id="noteta" placeholder="このプロジェクトについてのメモ（markdown 可、.devboard/note.md に保存）"></textarea>
+        <div class="actions">
+          <button class="btn" id="notesave">Save note</button>
+          <span class="savedstate" id="noteinfo">${d.note ? d.note.length+' chars saved' : 'no note yet'}</span>
+        </div>
+      </div>`;
+    const ta = $("#noteta"); ta.value = d.note || "";
+    $("#notesave").onclick = async () => {
+      try{
+        const r = await (await fetch("/api/note?path="+encodeURIComponent(d.path),
+          {method:"POST", body:ta.value})).json();
+        if(r.error) return toast("メモ保存失敗: "+r.error, true);
+        d.note = ta.value;
+        $("#noteinfo").textContent = r.length+" chars saved";
+        // update has_note in list cache
+        const li = PROJECTS.find(p => p.path === d.path);
+        if(li) li.has_note = !!ta.value.trim();
+        toast("✓ メモを保存しました");
+      }catch(e){ toast("メモ保存失敗: "+e, true); }
+    };
+  } else {
+    pane.innerHTML = `<dl class="info">
+      <dt>Path</dt><dd>${esc(d.path)}</dd>
+      ${d.ide_host_path?`<dt>Host path</dt><dd>${esc(d.ide_host_path)}</dd>`:""}
+      <dt>Git remote</dt><dd>${g.remote?esc(g.remote):"—"}</dd>
+      <dt>Last subject</dt><dd>${esc(g.last_subject||"—")}</dd>
+      <dt>Last commit (ISO)</dt><dd>${esc(g.last_commit_iso||"—")}</dd>
+      <dt>Last activity</dt><dd>${esc(d.last_activity||"—")}</dd>
+      <dt>Folder modified</dt><dd>${esc(d.mtime||"—")}</dd>
+      <dt>README file</dt><dd>${esc(d.readme_name||"none")}</dd>
+    </dl>`;
+  }
+}
+
+function refreshTagFilter(){
+  const tagSet = [...new Set(PROJECTS.flatMap(p => p.tags||[]))].sort();
+  const cur = $("#ftag").value;
+  $("#ftag").innerHTML = '<option value="">All tags</option>' +
+    tagSet.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  if(tagSet.includes(cur)) $("#ftag").value = cur;
+}
+
+/* ---- load ---- */
+async function loadConfig(){
+  try{ CONFIG = await (await fetch("/api/config")).json(); }
+  catch(e){ CONFIG = {ide_enabled:false}; }
+}
+
+async function load(force){
+  const archived = $("#archived").checked ? "1" : "0";
+  const url = "/api/projects?archived="+archived + (force?"&force=1":"");
+  const r = await (await fetch(url)).json();
+  $("#root").textContent = r.root;
+  PROJECTS = r.projects;
+  const tools = [...new Set(PROJECTS.flatMap(p=>p.ai_tools))].sort();
+  $("#ftool").innerHTML = '<option value="">All AI tools</option>' +
+    tools.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  refreshTagFilter();
+  renderList();
+  if(SELECTED && !PROJECTS.find(p=>p.path===SELECTED)){ SELECTED=null; $("#detail").innerHTML='<div class="empty">select a project ◂</div>'; }
+}
+
+["q","ftool","fstatus","ftag","fsort","fav"].forEach(id => $("#"+id).addEventListener("input", renderList));
+$("#archived").addEventListener("change", () => load(true));
+$("#rescan").onclick = async () => { $("#rescan").textContent="↻ …"; await load(true); $("#rescan").textContent="↻ Rescan"; };
+
+/* ---- toast ---- */
+let toastTimer=null;
+function toast(msg, isErr){
+  const t=$("#toast"); t.textContent=msg; t.className="show"+(isErr?" err":"");
+  clearTimeout(toastTimer);
+  if(msg) toastTimer=setTimeout(()=>{ t.className=""; }, isErr?6000:3500);
+}
+
+/* ---- delete (move to .trash) ---- */
+async function del(path, name){
+  if(!confirm(`"${name}" を .trash に移動します。\n（ダッシュボードからは消えますが、後で復元できます）\n\n続行しますか？`)) return;
+  try{
+    const r=await (await fetch("/api/delete?path="+encodeURIComponent(path),{method:"POST"})).json();
+    if(r.error) return toast("削除失敗: "+r.error, true);
+    SELECTED=null; $("#detail").innerHTML='<div class="empty">select a project ◂</div>';
+    await load(true);
+    toast(`🗑 "${name}" を .trash に移動しました`);
+  }catch(e){ toast("削除失敗: "+e, true); }
+}
+
+/* ---- archive / unarchive ---- */
+async function archive(path, name){
+  try{
+    const r=await (await fetch("/api/archive?path="+encodeURIComponent(path),{method:"POST"})).json();
+    if(r.error) return toast("アーカイブ失敗: "+r.error, true);
+    SELECTED=null; $("#detail").innerHTML='<div class="empty">select a project ◂</div>';
+    await load(true);
+    toast(`📦 "${name}" をアーカイブしました`);
+  }catch(e){ toast("アーカイブ失敗: "+e, true); }
+}
+async function unarchive(path, name){
+  try{
+    const r=await (await fetch("/api/unarchive?path="+encodeURIComponent(path),{method:"POST"})).json();
+    if(r.error) return toast("復元失敗: "+r.error, true);
+    SELECTED=r.restored_to; await load(true);
+    toast(`↩ "${name}" を復元しました`);
+    select(r.restored_to);
+  }catch(e){ toast("復元失敗: "+e, true); }
+}
+
+/* ---- drag & drop upload ---- */
+const SKIP_UPLOAD = new Set(["node_modules",".venv","venv","env","__pycache__",
+  "target","dist","build",".next",".nuxt",".cache","vendor",".gradle","Pods"]);
+
+function readEntries(reader){
+  return new Promise((res,rej)=>reader.readEntries(res,rej));
+}
+async function readAll(reader){
+  const out=[]; let batch;
+  do { batch=await readEntries(reader); out.push(...batch); } while(batch.length);
+  return out;
+}
+function entryFile(entry){ return new Promise((res,rej)=>entry.file(res,rej)); }
+
+async function collect(entry, prefix, files){
+  if(entry.isFile){
+    const f=await entryFile(entry);
+    files.push({file:f, relpath:prefix+entry.name});
+  } else if(entry.isDirectory){
+    if(SKIP_UPLOAD.has(entry.name)) return;
+    const kids=await readAll(entry.createReader());
+    for(const k of kids) await collect(k, prefix+entry.name+"/", files);
+  }
+}
+
+async function uploadFolder(rootEntry){
+  const project=rootEntry.name, files=[];
+  const top=await readAll(rootEntry.createReader());
+  for(const e of top) await collect(e, "", files);
+  if(!files.length){ toast("空のフォルダ、またはスキップ対象のみでした", true); return; }
+  let done=0, failed=0;
+  for(const {file, relpath} of files){
+    toast(`⤴ ${project} をアップロード中… ${++done}/${files.length}`);
+    try{
+      const r=await fetch(`/api/upload?project=${encodeURIComponent(project)}&relpath=${encodeURIComponent(relpath)}`,
+        {method:"POST", body:file});
+      if(!r.ok) failed++;
+    }catch(e){ failed++; }
+  }
+  await load(true);
+  toast(failed ? `⚠ ${project}: ${files.length-failed} 件成功 / ${failed} 件失敗` : `✓ ${project} をアップロードしました（${files.length} ファイル）`, !!failed);
+}
+
+async function uploadZip(file){
+  toast(`⤴ ${file.name} をアップロード中…`);
+  try{
+    const name=file.name.replace(/\.zip$/i,"");
+    const r=await (await fetch("/api/upload-zip?name="+encodeURIComponent(name),
+      {method:"POST", body:file})).json();
+    if(r.error) return toast("解凍失敗: "+r.error, true);
+    await load(true);
+    toast(`✓ ${file.name} を展開しました`);
+  }catch(e){ toast("アップロード失敗: "+e, true); }
+}
+
+const dz=$("#drop");
+["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev, e=>{
+  e.preventDefault(); e.stopPropagation(); dz.classList.add("over"); }));
+["dragleave","dragend"].forEach(ev=>dz.addEventListener(ev, e=>{
+  e.preventDefault(); e.stopPropagation(); dz.classList.remove("over"); }));
+dz.addEventListener("drop", async e=>{
+  e.preventDefault(); e.stopPropagation(); dz.classList.remove("over");
+  const items=[...(e.dataTransfer.items||[])];
+  const entries=items.map(it=>it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+  if(!entries.length){
+    // fallback: maybe a plain .zip file with no entry API
+    const f=[...(e.dataTransfer.files||[])][0];
+    if(f && /\.zip$/i.test(f.name)) return uploadZip(f);
+    return toast("フォルダまたは .zip をドロップしてください", true);
+  }
+  for(const en of entries){
+    if(en.isDirectory) await uploadFolder(en);
+    else { const f=await entryFile(en); if(/\.zip$/i.test(f.name)) await uploadZip(f);
+           else toast(`"${f.name}" は単体ファイルです。フォルダか .zip をドロップしてください`, true); }
+  }
+});
+
+(async () => { await loadConfig(); await load(); })();
+</script>
+<div id="toast"></div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Scanned project data (runtime content; not part of the app)
+/projects/*
+!/projects/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+
+# OS / editor junk
+.DS_Store
+._*
+.idea/
+.vscode/

@@ -1,0 +1,27 @@
+services:
+  devboard:
+    build: .
+    container_name: devboard
+    ports:
+      - "8080:8080"
+    volumes:
+      # Drop your project folders into ./projects on the host.
+      # Read-WRITE: required for the upload and delete features.
+      # (Deletes are moved to ./projects/.trash, not erased.)
+      - ./projects:/data/projects
+    # Match your host user so uploaded files aren't owned by root.
+    # Set to your own `id -u`:`id -g` (e.g. 1000:1000).
+    user: "1000:1000"
+    environment:
+      PROJECTS_DIR: /data/projects
+      PORT: "8080"
+      SCAN_DEPTH: "4"        # how deep to search for project roots
+      CACHE_TTL: "30"        # seconds before the list auto-rescans
+      MAX_UPLOAD_MB: "500"   # max size per uploaded file / zip
+      # Optional: enable "Open in VS Code / Cursor" buttons via Remote-SSH URLs.
+      # Leave empty to disable. Example:
+      #   IDE_REMOTE_HOST: "user@your-host"
+      #   IDE_HOST_PROJECTS: "/absolute/path/to/devboard/projects"
+      IDE_REMOTE_HOST: ""
+      IDE_HOST_PROJECTS: ""
+    restart: unless-stopped
