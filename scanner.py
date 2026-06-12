@@ -320,29 +320,53 @@ def scan(root, max_depth=4, include_archived=False):
     return projects
 
 
-def list_files(path, limit=300):
-    """Top-level contents of a project, dirs first, for the detail view."""
-    entries = []
-    try:
-        for child in sorted(path.iterdir()):
+def list_files(path, max_depth=3, limit=2000):
+    """Project contents as a nested tree (dirs first), up to max_depth levels deep.
+
+    Each entry has {name, kind, size}. Directory entries also carry "children"
+    (a list, possibly empty) and "truncated" (True when the directory's contents
+    were not expanded because max_depth was reached, so the UI can flag it).
+    SKIP_DIRS are listed but never descended into. ``limit`` caps the total
+    number of entries across the whole tree to keep the payload bounded.
+    """
+    counter = [0]
+
+    def walk(dir_path, depth):
+        entries = []
+        try:
+            children = sorted(dir_path.iterdir())
+        except (PermissionError, OSError):
+            return entries
+        for child in children:
+            if counter[0] >= limit:
+                break
             if child.name in SKIP_DIRS:
                 entries.append({"name": child.name + "/", "kind": "skipped", "size": 0})
+                counter[0] += 1
                 continue
+            is_dir = child.is_dir()
             try:
-                size = child.stat().st_size if child.is_file() else 0
+                size = child.stat().st_size if not is_dir else 0
             except OSError:
                 size = 0
-            entries.append({
-                "name": child.name + ("/" if child.is_dir() else ""),
-                "kind": "dir" if child.is_dir() else "file",
+            entry = {
+                "name": child.name + ("/" if is_dir else ""),
+                "kind": "dir" if is_dir else "file",
                 "size": size,
-            })
-            if len(entries) >= limit:
-                break
-    except (PermissionError, OSError):
-        pass
-    entries.sort(key=lambda e: (e["kind"] != "dir", e["name"].lower()))
-    return entries
+            }
+            counter[0] += 1
+            if is_dir:
+                if depth < max_depth:
+                    entry["children"] = walk(child, depth + 1)
+                    entry["truncated"] = False
+                else:
+                    entry["children"] = []
+                    entry["truncated"] = True
+            entries.append(entry)
+        entries.sort(key=lambda e: (e["kind"] != "dir", e["name"].lower()))
+        return entries
+
+    return walk(path, 1)
 
 
 def detail(path, archived=False):

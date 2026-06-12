@@ -33,7 +33,7 @@
 - 言語と **AI ツールの推定**（Claude Code, Codex, Cursor, Copilot, Gemini, Aider, Continue）
 - **Git の状態**: ブランチ・未コミット変更・ahead/behind・最終コミット・リモート
 - 最終アクティビティ（git 最終コミットまたはフォルダ更新時刻）でソート
-- README のレンダリング表示とトップレベルのファイル構成
+- README のレンダリング表示と**開閉できるファイルツリー**（フォルダをクリックすると中身をその場で展開/折りたたみ。3 階層までネスト表示し、それより深い階層は印を付けて表示）
 - **AI ルールファイルの閲覧**（`CLAUDE.md` / `.cursorrules` / `AGENTS.md` / `GEMINI.md` / copilot-instructions / `.aider.conf.yml`）
 - プロジェクトごとの**タグ・お気に入り**（`<project>/.devboard/tags.json`）と**メモ**（`<project>/.devboard/note.md`）
 - **ドラッグ＆ドロップ**でフォルダ / `.zip` アップロード（macOS の `__MACOSX/`・`.DS_Store`・`._*` は自動除去）

@@ -203,6 +203,9 @@
   .frow .ic{width:16px; color:var(--faint)}
   .frow.dir .nm{color:var(--blue)} .frow.skip .nm{color:var(--faint)}
   .frow .sz{margin-left:auto; color:var(--faint); font-size:11px}
+  .frow.tog{cursor:pointer; user-select:none}
+  .frow.tog .ic{color:var(--blue)}
+  .fchildren.closed{display:none}
 
   /* AI rules */
   .ruleblock{margin-bottom:28px; max-width:760px}
@@ -284,6 +287,31 @@ let PROJECTS = [], SELECTED = null, TAB = "readme", CONFIG = {};
 function status(p){ return !p.git.is_repo ? "nogit" : (p.git.dirty ? "dirty" : "clean"); }
 function esc(s){ return (s||"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtSize(n){ if(!n) return ""; const u=["B","K","M","G"]; let i=0; while(n>=1024&&i<3){n/=1024;i++;} return n.toFixed(n<10&&i?1:0)+u[i]; }
+function renderTree(nodes, depth){
+  const pad = 8 + depth*16;
+  return (nodes||[]).map(f=>{
+    if(f.kind==="dir"){
+      const kids = f.children||[];
+      const hasKids = kids.length>0;
+      if(hasKids){
+        return `<div class="frow dir tog" style="padding-left:${pad}px" onclick="toggleDir(this)"><span class="ic">▸</span><span class="nm">${esc(f.name)}</span></div>`
+             + `<div class="fchildren closed">${renderTree(kids, depth+1)}</div>`;
+      }
+      // empty, or contents not loaded because the depth limit was reached
+      const sz = f.truncated ? '<span class="sz">…</span>' : "";
+      return `<div class="frow dir" style="padding-left:${pad}px"><span class="ic">▹</span><span class="nm">${esc(f.name)}</span>${sz}</div>`;
+    }
+    const cls = f.kind==="skipped"?"skip":"";
+    const ic = f.kind==="skipped"?"⊘":"·";
+    return `<div class="frow ${cls}" style="padding-left:${pad}px"><span class="ic">${ic}</span><span class="nm">${esc(f.name)}</span><span class="sz">${fmtSize(f.size)}</span></div>`;
+  }).join("");
+}
+function toggleDir(el){
+  const body = el.nextElementSibling;
+  if(!body || !body.classList.contains("fchildren")) return;
+  const closed = body.classList.toggle("closed");
+  el.querySelector(".ic").textContent = closed ? "▸" : "▾";
+}
 function fmtActivity(iso){
   if(!iso) return "";
   try{
@@ -486,11 +514,7 @@ function paint(d){
   if(TAB==="readme"){
     pane.innerHTML = `<div class="md">${md(d.readme)}</div>`;
   } else if(TAB==="files"){
-    pane.innerHTML = `<div class="files">${d.files.map(f=>{
-      const cls = f.kind==="dir"?"dir":(f.kind==="skipped"?"skip":"");
-      const ic = f.kind==="file"?"·":(f.kind==="skipped"?"⊘":"▸");
-      return `<div class="frow ${cls}"><span class="ic">${ic}</span><span class="nm">${esc(f.name)}</span><span class="sz">${fmtSize(f.size)}</span></div>`;
-    }).join("")}</div>`;
+    pane.innerHTML = `<div class="files">${renderTree(d.files, 0)}</div>`;
   } else if(TAB==="airules"){
     const rules = d.ai_rules || [];
     if(!rules.length){ pane.innerHTML = `<div class="noai">No AI rule files detected (CLAUDE.md, .cursorrules, AGENTS.md, GEMINI.md, .github/copilot-instructions.md, .aider.conf.yml).</div>`; }

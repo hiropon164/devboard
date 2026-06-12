@@ -33,7 +33,7 @@ dependencies.
 - Language and **AI-tool detection** (Claude Code, Codex, Cursor, Copilot, Gemini, Aider, Continue)
 - **Git status**: branch, uncommitted changes, ahead/behind, last commit, remote
 - Sort by last activity (last commit or folder mtime)
-- README rendering and top-level file listing
+- README rendering and an **expandable file tree** — click a folder to fold/unfold its contents inline (nested up to 3 levels deep; deeper folders are flagged)
 - **AI rule-file viewer** (`CLAUDE.md` / `.cursorrules` / `AGENTS.md` / `GEMINI.md` / copilot-instructions / `.aider.conf.yml`)
 - Per-project **tags & favorites** (`<project>/.devboard/tags.json`) and **notes** (`<project>/.devboard/note.md`)
 - **Drag & drop** folder / `.zip` upload (macOS `__MACOSX/`, `.DS_Store`, `._*` stripped automatically)
